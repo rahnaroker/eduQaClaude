@@ -13,6 +13,12 @@
 - Приоритет: полировка, не обучение с нуля
 - Темы: OOP, Collections, Multithreading, Streams, JVM internals
 
+## Cheatsheet Workflow
+
+- После каждого разобранного вопроса писать выжимку в CHEATSHEET.md (основной файл в репо)
+- Затем дублировать в memory (cheatsheet_qa.md или cheatsheet_oop.md)
+- Не ждать команды "фиксируй" — делать автоматически
+
 ## Answer Format
 
 - Для концептуальных вопросов: определение → нюансы → типичные ошибки на собеседовании
