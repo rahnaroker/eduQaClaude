@@ -554,4 +554,93 @@ hotfix/*   — срочный фикс от main
 | Сложность | низкая | высокая | низкая |
 | Подходит для | большинства | несколько версий в проде | зрелые CI/CD команды |
 
-_тема Docker появится по мере прохождения_
+---
+
+## Docker
+
+**Container vs VM**
+- VM: гипервизор → гостевое ядро → процессы. Стартует минуты, образ гигабайты.
+- Container: процесс на ядре хоста, изолированный через:
+  - **namespaces** — изоляция PID, сети, файловой системы, hostname
+  - **cgroups** — ограничение CPU, RAM, I/O
+- Стартует секунды, образ мегабайты. Изоляция слабее: взлом ядра хоста → все контейнеры.
+- Ловушка: Docker на Windows/Mac — внутри Linux VM (Docker Desktop). На Linux — напрямую.
+
+**Dockerfile — основные инструкции**
+- `FROM` — базовый образ
+- `WORKDIR` — рабочая директория внутри контейнера
+- `COPY` — копирует файлы с хоста в образ
+- `RUN` — выполняется при **сборке** образа (установка пакетов)
+- `EXPOSE` — документирует порт (не открывает реально)
+- `ENV` — переменная окружения
+- `CMD` — команда при **запуске** контейнера, можно переопределить в `docker run`
+- `ENTRYPOINT` — фиксированный исполняемый файл, нельзя переопределить
+
+```dockerfile
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY target/myapp.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+```
+
+- `RUN` vs `CMD`: RUN — сборка, CMD — запуск
+- `COPY` vs `ADD`: ADD умеет `.tar` и URL, но используй COPY если не нужно это
+- Каждый `RUN` = новый слой → объединять через `&&` чтобы не раздувать образ
+- `ENTRYPOINT` + `CMD`: ENTRYPOINT фиксирует команду, CMD задаёт аргументы по умолчанию
+
+**docker-compose**
+- Оркестрация нескольких контейнеров через один `docker-compose.yml`
+- `image` — готовый образ; `build` — собрать из Dockerfile
+- `ports` — `хост:контейнер`; `environment` — переменные окружения; `volumes` — персистентность данных
+- `depends_on` — порядок старта, но не готовность сервиса (ловушка!)
+- Все сервисы в одной сети → обращаются друг к другу по имени сервиса (`db`, `app`)
+
+```bash
+docker-compose up -d     # поднять в фоне
+docker-compose down      # остановить + удалить контейнеры
+docker-compose logs app  # логи сервиса
+docker-compose ps        # статус
+```
+
+Для QA: `up` перед сьютом → прогон → `down`. Воспроизводимое изолированное окружение в CI.
+
+**Основные команды Docker**
+```bash
+docker run -d -p 8080:80 --name myapp nginx  # запуск: фон, порт хост:контейнер, имя
+docker run --rm nginx                         # удалить контейнер после остановки
+docker ps / docker ps -a                      # живые / все контейнеры
+docker exec -it myapp bash                    # зайти внутрь контейнера
+docker logs -f myapp                          # логи в реальном времени
+docker stop myapp / docker rm myapp           # остановить / удалить
+docker rm -f myapp                            # остановить + удалить сразу
+docker build -t myapp:1.0 .                   # собрать образ из Dockerfile
+docker images / docker rmi nginx              # список образов / удалить образ
+```
+- `docker stop` — SIGTERM (graceful); `docker kill` — SIGKILL (немедленно)
+- Для QA: `logs -f` — дебаг сервиса; `exec -it` — проверить файлы/переменные внутри; `ps -a` — понять почему упал
+
+**Volumes**
+- Контейнер эфемерный: удалил → данные пропали. Volume — директория вне контейнера.
+- Именованный (`pgdata:/var/lib/postgresql/data`) — Docker управляет хранилищем
+- Bind mount (`/host/path:/container/path`) — конкретная папка с хоста
+
+| | Именованный | Bind mount |
+|---|---|---|
+| Хранение | Docker (`/var/lib/docker/volumes/`) | путь на хосте |
+| Когда | данные БД | конфиги, логи |
+
+- Для QA: `docker-compose down -v` — удалить контейнеры + volumes → чистая БД перед прогоном
+
+**Docker в CI/CD**
+- Пайплайн: `build jar → docker build → docker-compose up → tests → docker-compose down -v`
+- Готовность контейнера — не retry в тестах, а `healthcheck` + `depends_on: condition: service_healthy`
+- Testcontainers — поднимает контейнеры из Java-кода, гарантирует готовность к первому тесту
+- Параллелизация сьютов: `docker-compose -p suite1 up` / `-p suite2 up` — разные namespace, нет конфликтов портов
+
+**Docker Registry / Docker Hub**
+- Хранит **образы** (не Dockerfile, не docker-compose)
+- Путь: `docker build` → `docker push` → Registry → `docker pull` → сервер
+- Docker Hub — публичный. В компаниях: AWS ECR, GitLab Registry, JFrog Artifactory
+- Теги: `1.0.0` — для прода; `latest` — опасно (непредсказуемо); `main-abc123` — лучшая практика в CI
+- Ловушка: `latest` не обновляется автоматически — это просто тег, нужно явно пушить
