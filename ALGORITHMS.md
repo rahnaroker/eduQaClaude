@@ -92,6 +92,24 @@ String formatted = s.toLowerCase().replaceAll("[^a-zа-яё0-9]", "");
 ```
 Дальше — тот же базовый алгоритм. Альтернатива без regex (follow-up на собесе): `Character.isLetterOrDigit()` прямо в цикле — пропускать «мусорные» символы движением указателей, O(1) доппамяти.
 
+**Нормализация без regex (предпочтительнее — O(1) память, частый follow-up «сделай без replaceAll»):**
+```java
+static boolean isPalindromeNormalized(String s) {
+    if (s == null) return false;
+    if (s.length() < 2) return true;
+    int left = 0, right = s.length() - 1;
+    while (left < right) {
+        while (left < right && !Character.isLetterOrDigit(s.charAt(left)))  left++;   // перешагнуть мусор слева
+        while (left < right && !Character.isLetterOrDigit(s.charAt(right))) right--;  // перешагнуть мусор справа
+        if (Character.toLowerCase(s.charAt(left)) != Character.toLowerCase(s.charAt(right))) return false;
+        left++;
+        right--;
+    }
+    return true;
+}
+```
+Внутренние `while` НЕ возвращают false и НЕ бегут до конца — они **пропускают** незначимые символы, сдвигая указатель до ближайшей буквы/цифры. Условие `while` — «пока продолжать двигаться»: `!isLetterOrDigit` = «пока это мусор». False даёт только внешнее сравнение, когда оба указателя стоят на значимых символах. Кириллица проходит бесплатно — `isLetterOrDigit`/`toLowerCase` понимают Unicode (в regex-варианте русские буквы пришлось бы вписывать явно).
+
 **Сложность:** время O(n), память O(n) из-за `toCharArray()`; вариант с `charAt(left)` вместо массива — O(1) память.
 
 **Ловушки:**
@@ -109,6 +127,11 @@ String formatted = s.toLowerCase().replaceAll("[^a-zа-яё0-9]", "");
 - Регулярку для нормализации не знал — написал плейсхолдер. Запомнить: `[^a-zа-яё0-9]`
 - Расширенный вариант не доделал — убрал нормализацию вместо исправления
 - Статус: базовый ✅ (со 2-й попытки), нормализация 🔄 → повтор завтра
+
+**Мои ошибки (2026-06-14, нормализация без regex):**
+- `right++` вместо `right--` в конце цикла — правый указатель уползал вправо, выход за границы / StringIndexOutOfBounds. two pointers: left растёт, right убывает, сходятся в центре.
+- Недопонимания (разобраны): думал, что внутренние `while` бегут до конца строки и возвращают false — на деле они пропускают мусор и встают на первой значимой букве; зачем `!` в `isLetterOrDigit` — условие `while` это «пока продолжать» = «пока мусор».
+- Статус: нормализация ✅ (вариант без regex прогнан на 9 кейсах вкл. кириллицу)
 
 ### Anagram
 
