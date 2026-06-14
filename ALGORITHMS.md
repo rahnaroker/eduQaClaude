@@ -7,7 +7,7 @@
 | Уровень | Задачи |
 |---|---|
 | **A. Строки** | reverse 🔄 (решено с подглядыванием — повторить по памяти), palindrome, anagram, первый неповторяющийся символ, частота символов, valid brackets |
-| **B. Массивы** | two sum, second max, remove duplicates, missing number, merge sorted, сдвиг массива, пересечение, подсчёт пар, сортировка Map по value |
+| **B. Массивы** | two sum ✅ (brute + HashMap), second max, remove duplicates, missing number, merge sorted, сдвиг массива, пересечение, подсчёт пар, сортировка Map по value |
 | **C. Числа** | FizzBuzz, fibonacci (итер. + рекурсия), factorial, prime, реверс числа, binary search, bubble/insertion sort |
 | **D. Коллекции/Stream** | Comparator-сортировка, filter/map/collect, groupingBy, пересечение через Set |
 | **E. Паттерны** | two pointers, sliding window, HashSet для O(1), longest substring without repeating chars |
@@ -308,3 +308,57 @@ static boolean isValidBrackets(String s) {
 - Снова тянуло в особые случаи (первый символ — отдельно, «не-скобки» в guard с переменной цикла, которой там не существует)
 - Зачтено: guard на чётность — сам; трасса `"((([]"` с «долгом» — построил сам и правильно
 - Статус: ✅ все 7 тестов
+
+---
+
+## Массивы
+
+### Two Sum
+
+Дан `int[] nums` и `target`, вернуть **индексы** двух элементов с суммой `target` (ровно одно решение, элемент дважды нельзя).
+
+**Brute force — O(n²) время / O(1) память:**
+```java
+static int[] twoSum(int[] nums, int target) {
+    if (nums.length < 2) return null;
+    for (int i = 0; i < nums.length; i++) {
+        for (int j = i + 1; j < nums.length; j++) {   // j от i+1: не сам с собой, без повторов пар
+            if (nums[i] + nums[j] == target) return new int[]{i, j};
+        }
+    }
+    return null;
+}
+```
+
+**HashMap — O(n) время / O(n) память (дефолт на собесе):**
+```java
+static int[] twoSumHashMap(int[] nums, int target) {
+    if (nums.length < 2) return null;
+    Map<Integer, Integer> map = new HashMap<>();
+    for (int i = 0; i < nums.length; i++) {
+        int tail = target - nums[i];
+        if (map.containsKey(tail)) return new int[]{map.get(tail), i};  // ищем среди ПРЕДЫДУЩИХ
+        map.put(nums[i], i);                                            // кладём ПОСЛЕ проверки
+    }
+    return null;
+}
+```
+
+**Идея HashMap:** вопрос не «перебрать все пары», а «встречал ли раньше число `target - nums[i]`?». Хранилище пройденного `Map<значение, индекс>` → проверка за O(1). Размен памяти на скорость.
+
+**Почему ключ = значение, value = индекс:** искать надо ПО ЧИСЛУ (`containsKey`/`get` за O(1) работают по ключу) → число в ключ; вернуть надо индекс → индекс в value.
+
+**Почему `put` ПОСЛЕ проверки:** иначе на `[3,3], target=6` найдёшь сам себя → `{0,0}` (элемент дважды). Проверяя до вставки, ищешь только среди предыдущих.
+
+**Ловушки:**
+- `for (int x : nums)` НЕ годится: даёт значение, а нужен индекс (вернуть `{i,j}` и считать `j=i+1`). **Паттерн «вложенный перебор пар» требует индексного `for`.** Даже при возврате значений двойной for-each сломан: складывает элемент сам с собой (`[4],8 → {4,4}`) — без индекса не отсечь.
+- `map.get(tail) != 0` — ДВА бага: 1) если ключа нет, `get` вернёт `null` → распаковка `null != 0` = **NPE**; 2) индекс `0` валиден, `!= 0` пропустит ответ на нулевом индексе. Только `containsKey`.
+- Возвращать индексы, а не значения (частая путаница в условии).
+- `tail` объявлять внутри цикла (узкая область видимости).
+
+**Two pointers тут НЕ подходит:** работает только на отсортированном массиве и теряет исходные индексы (а их надо вернуть). brute force / HashMap.
+
+**Мои ошибки (2026-06-14):**
+- Первая версия: завёл `right = length-1` (имена из two pointers), не двигал его → сравнивал каждый элемент только с последним; `while` отрабатывал один раз. Смешал brute force и two pointers.
+- В HashMap-версии снова `for-each` с `nums[i]` (i как значение И как индекс одновременно); `map.get(tail) != 0` вместо `containsKey`.
+- Зачтено: O-сложности проговорил сам верно; структуру brute force словами описал до кода правильно.
